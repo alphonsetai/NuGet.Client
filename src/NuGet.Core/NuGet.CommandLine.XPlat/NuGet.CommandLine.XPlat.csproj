@@ -10,7 +10,6 @@
     <OutputType>Exe</OutputType>
     <Shipping>true</Shipping>
     <PackProject>true</PackProject>
-    <XPLATProject>true</XPLATProject>
   </PropertyGroup>
 
   <ItemGroup>
