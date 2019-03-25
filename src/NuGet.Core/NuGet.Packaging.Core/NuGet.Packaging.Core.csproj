@@ -9,7 +9,6 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <PackProject>true</PackProject>
     <Shipping>true</Shipping>
-    <XPLATProject>true</XPLATProject>
     <SkipShared>true</SkipShared>
   </PropertyGroup>
 
