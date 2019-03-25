@@ -10,7 +10,6 @@
     <Shipping>true</Shipping>
     <RootNamespace>NuGet.DependencyResolver</RootNamespace>
     <IncludeInVSIX>true</IncludeInVSIX>
-    <XPLATProject>true</XPLATProject>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(IsVsixBuild)' == 'true' ">
