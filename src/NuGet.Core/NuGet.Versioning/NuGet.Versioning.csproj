@@ -10,7 +10,6 @@
     <PackProject>true</PackProject>
     <Shipping>true</Shipping>
     <IncludeInVSIX>true</IncludeInVSIX>
-    <XPLATProject>true</XPLATProject>
   </PropertyGroup>
   
   <PropertyGroup Condition=" '$(IsVsixBuild)' == 'true' ">
