@@ -1181,7 +1181,7 @@ EndProject");
                     server.Stop();
 
                     // Assert
-                    Assert.Equal(_successCode, r1.Item1);
+                    Assert.True(_successCode == r1.Item1, r1.AllOutput);
                     Assert.True(getPackageByVersionIsCalled, "getPackageByVersionIsCalled");
                     Assert.True(packageDownloadIsCalled, "getPackageByVersionIsCalled");
                 }
