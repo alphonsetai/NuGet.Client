@@ -21,29 +21,26 @@ phases:
     displayName: "Find NuGet.Client Build"
     inputs:
       scriptType: "inlineScript"
-      arguments: "-PersonalAccessToken $(VstsPersonalAccessToken) -RootUrl $(VstsRestApiRootUrl) -DefinitionId $(NuGetClientDefinitionId)"
+      arguments: "-personalAccessToken $(VstsPersonalAccessToken) -rootUrl $(VstsRestApiRootUrl) -buildDefinitionId $(NuGetClientDefinitionId) -branchName $(NuGetClientBranchName) -dropRoot $(DropRoot)"
       inlineScript: |
-        Param([string]$PersonalAccessToken, [string]$RootUrl, [string]$DefinitionId)
-        $branchName = $env:NuGetClientBranch
-        $url = '{0}/build/builds?definitions={1}&statusFilter=completed&resultFilter=succeeded,partiallySucceeded&$top=1&tagFilters={2}&api-version=2.0' -f $RootUrl, $definitionId, $branchName
-        $Base64Token = [System.Convert]::ToBase64String([char[]]":$PersonalAccessToken")
-        $Headers = @{ Authorization = 'Basic {0}' -f $Base64Token; }
-        $builds = Invoke-RestMethod -Uri $url -Method GET -Headers $Headers
+        Param([string] $personalAccessToken, [string] $rootUrl, [string] $buildDefinitionId, [string] $branchName, [string] $dropRoot)
+        $url = '{0}/build/builds?definitions={1}&statusFilter=completed&resultFilter=succeeded,partiallySucceeded&$top=1&tagFilters={2}&api-version=2.0' -f $rootUrl, $buildDefinitionId, $branchName
+        $base64Token = [System.Convert]::ToBase64String([char[]]":$personalAccessToken")
+        $headers = @{ Authorization = 'Basic {0}' -f $base64Token; }
+        $builds = Invoke-RestMethod -Uri $url -Method GET -Headers $headers
         $desiredBuild =  $builds.value
         Write-Host $desiredBuild
         $sourceVersion = $desiredBuild.sourceVersion
         $buildNumber = $desiredBuild.buildNumber
-        $NupkgDirectory = "$env:DropRoot\$branchName\$buildNumber\artifacts\VS15\Nupkgs\"
+        $nupkgsDirectoryPath = "$dropRoot\$branchName\$buildNumber\artifacts\VS15\Nupkgs\"
         $manifestFilePath="$($Env:BUILD_ARTIFACTSTAGINGDIRECTORY)\buildmanifest.xml"
         $repoUri=$Env:BUILD_REPOSITORY_URI
         Write-Host "##vso[task.setvariable variable=NuGetClientRepoUri]$repoUri"
         Write-Host "##vso[task.setvariable variable=NuGetClientBuildId]$buildNumber"
         Write-Host "##vso[task.setvariable variable=NuGetClientBranch]$branchName"
         Write-Host "##vso[task.setvariable variable=NuGetClientCommit]$sourceVersion"
-        Write-Host "##vso[task.setvariable variable=NuGetClientNupkgsDirectoryPath]$NupkgDirectory"
+        Write-Host "##vso[task.setvariable variable=NuGetClientNupkgsDirectoryPath]$nupkgsDirectoryPath"
         Write-Host "##vso[task.setvariable variable=ManifestFilePath]$manifestFilePath"
-        Write-Host $sourceVersion, $branchName, $buildNumber
-        Write-Host $NupkgDirectory
 
   - task: PowerShell@1
     displayName: "Print Environment Variables"
@@ -52,20 +49,38 @@ phases:
       inlineScript: |
         gci env:* | sort-object name
 
+#  - task: MSBuild@1
+#    displayName: "Generate build manifest file"
+#    inputs:
+#      solution: 'build\\publish.proj'
+#      msbuildVersion: 15.0
+#      configuration: '$(BuildConfiguration)'
+#      msbuildArguments: '/t:GenerateManifest /p:NuGetClientNupkgsDirectoryPath=$(NuGetClientNupkgsDirectoryPath) /p:FeedUrl=$(FeedUrl) /p:BuildId=$(NuGetClientBuildId) /p:RepoBranch=$(NuGetClientBranch) /p:RepoCommit=$(NuGetClientCommit) /p:RepoUri=$(NuGetClientRepoUri) /p:ManifestFilePath=$(ManifestFilePath)'
+
   - task: MSBuild@1
-    displayName: "Generate build manifest"
+    displayName: "Publish packages to build asset registry"
     inputs:
       solution: 'build\\publish.proj'
       msbuildVersion: 15.0
       configuration: '$(BuildConfiguration)'
-      msbuildArguments: '/t:GenerateManifest /p:NuGetClientNupkgsDirectoryPath=$(NuGetClientNupkgsDirectoryPath) /p:FeedUrl=$(FeedUrl) /p:BuildId=$(NuGetClientBuildId) /p:RepoBranch=$(NuGetClientBranch) /p:RepoCommit=$(NuGetClientCommit) /p:RepoUri=$(NuGetClientRepoUri) /p:ManifestFilePath=$(ManifestFilePath)'
+      msbuildArguments: '/t:PublishPackagesToBuildAssetRegistry /p:NuGetClientNupkgsDirectoryPath=$(NuGetClientNupkgsDirectoryPath) /p:FeedUrl=$(FeedUrl) /p:BuildId=$(NuGetClientBuildId) /p:RepoBranch=$(NuGetClientBranch) /p:RepoCommit=$(NuGetClientCommit) /p:RepoUri=$(NuGetClientRepoUri) /p:ManifestFilePath=$(ManifestFilePath) /p:MaestroAccessToken=$(MaestroAccessToken)'
+
 
   - task: PowerShell@1
-    displayName: "Upload build manifest"
+    displayName: "Upload manifest fileas build artifact"
     inputs:
       scriptType: "inlineScript"
       inlineScript: |
         Write-Host "##vso[task.uploadfile]$(ManifestFilePath)"
+
+
+  - task: MSBuild@1
+    displayName: "Publish manifest to build asset registry"
+    inputs:
+      solution: 'build\\publish.proj'
+      msbuildVersion: 15.0
+      configuration: '$(BuildConfiguration)'
+      msbuildArguments: '/t:PublishManifestToBuildAssetRegistry /p:MaestroApiEndpoint=$(MaestroApiEndpoint) /p:ManifestFilePath=$(ManifestFilePath) /p:MaestroAccessToken=$(MaestroAccessToken)'
 
   - task: PowerShell@1
     displayName: "Add Build Tags"
