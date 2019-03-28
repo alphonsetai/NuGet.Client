@@ -25,8 +25,7 @@ phases:
       inlineScript: |
         Param([string]$PersonalAccessToken, [string]$RootUrl, [string]$DefinitionId)
         $branchName = $env:NuGetClientBranch
-        $buildNumber = $env:NuGetClientBuildId
-        $url = '{0}/build/builds?definitions={1}&statusFilter=completed&resultFilter=succeeded,partiallySucceeded&$top=1&tagFilters={2}&buildNumber={3}&api-version=2.0' -f $RootUrl, $definitionId, $branchName, $buildNumber
+        $url = '{0}/build/builds?definitions={1}&statusFilter=completed&resultFilter=succeeded,partiallySucceeded&$top=1&tagFilters={2}&api-version=2.0' -f $RootUrl, $definitionId, $branchName
         $Base64Token = [System.Convert]::ToBase64String([char[]]":$PersonalAccessToken")
         $Headers = @{ Authorization = 'Basic {0}' -f $Base64Token; }
         $builds = Invoke-RestMethod -Uri $url -Method GET -Headers $Headers
@@ -61,8 +60,6 @@ phases:
       configuration: '$(BuildConfiguration)'
       msbuildArguments: '/t:GenerateManifest /p:NuGetClientNupkgsDirectoryPath=$(NuGetClientNupkgsDirectoryPath) /p:FeedUrl=$(FeedUrl) /p:BuildId=$(NuGetClientBuildId) /p:RepoBranch=$(NuGetClientBranch) /p:RepoCommit=$(NuGetClientCommit) /p:RepoUri=$(NuGetClientRepoUri) /p:ManifestFilePath=$(ManifestFilePath)'
 
-#PublishBuildAssets
-
   - task: PowerShell@1
     displayName: "Upload build manifest"
     inputs:
@@ -75,6 +72,6 @@ phases:
     inputs:
       scriptType: "inlineScript"
       inlineScript: |
-        Write-Host "##vso[build.addbuildtag]$NuGetClientBuildId"
-        Write-Host "##vso[build.addbuildtag]$NuGetClientBranch"
-        Write-Host "##vso[build.addbuildtag]$NuGetClientCommit"
+        Write-Host "##vso[build.addbuildtag]$(NuGetClientBuildId)"
+        Write-Host "##vso[build.addbuildtag]$(NuGetClientBranch)"
+        Write-Host "##vso[build.addbuildtag]$(NuGetClientCommit)"
