@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), 'README.md'))\build\common.props" />
 
   <!--
@@ -11,15 +11,36 @@
   <Import Project="$(BlobPublishTargetsPath)" />
   <Import Project="$(BuildCommonDirectory)common.targets" />
 
-  <ItemGroup>
-    <ItemsToPush Include="$(NUGET_CLIENT_NUPKGDIRECTORY)*.nupkg" />
-  </ItemGroup>
-  
-  <PropertyGroup>
-    <PublishOverwrite Condition="'$(PublishOverwrite)' == ''">false</PublishOverwrite>
-  </PropertyGroup>
+  <Target Name="GenerateManifest">
+    <Error Condition="!Exists($(NuGetClientNupkgsDirectoryPath))" Text="Package output directory '$(NuGetClientNupkgsDirectoryPath)' does not exist." />
+    <Error Condition="'$(FeedUrl)' == ''" Text="The FeedUrl property must be passed." />
 
-  <Target Name="Build">
+    <ItemGroup>
+      <Artifacts Include="$(NuGetClientNupkgsDirectoryPath)*.nupkg" />
+    </ItemGroup>
+
+    <Error Condition="'@(Artifacts)' == ''" Text="No packages to push." />
+
+    <ItemGroup>
+      <BuildData Include="Location=$(FeedUrl)" />
+    </ItemGroup>
+
+    <Error Condition="'$(BuildId)' == ''" Text="The BuildId property is required." />
+    <Error Condition="'$(ManifestFilePath)' == ''" Text="The ManifestFilePath property is required." />
+    <Error Condition="'$(RepoBranch)' == ''" Text="The RepoBranch property is required." />
+    <Error Condition="'$(RepoCommit)' == ''" Text="The RepoCommit property is required." />
+    <Error Condition="'$(RepoUri)' == ''" Text="The RepoUri property is required." />
+
+    <GenerateBuildManifest Artifacts="@(Artifacts)"
+                           BuildData="@(BuildData)"
+                           BuildId="$(BuildId)"
+                           OutputPath="$(ManifestFilePath)"
+                           RepoBranch="$(RepoBranch)"
+                           RepoCommit="$(RepoCommit)"
+                           RepoUri="$(RepoUri)" />
+  </Target>
+
+  <Target Name="PublishPackages">
     <Error Text="Package output directory '$(NUGET_CLIENT_NUPKGDIRECTORY)' does not exist."
           Condition="!Exists($(NUGET_CLIENT_NUPKGDIRECTORY))" />
 
@@ -40,6 +61,7 @@
                     ManifestBuildId="$(ManifestBuildId)"
                     ManifestCommit="$(ManifestCommit)"
                     ManifestName="nuget.client"
+                    ManifestRepoUri=""
                     SkipCreateManifest="false" />
   </Target>
 
