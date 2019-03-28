@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
@@ -13,11 +14,19 @@ namespace GenerateTestPackages
     {
         const string keyFileName = "TestPackageKey.snk";
 
+        private static string _logFilePath;
+        private static Stopwatch _stopwatch;
+
         static Dictionary<string, PackageInfo> _packages = new Dictionary<string, PackageInfo>();
 
         static void Main(string[] args)
         {
+            _stopwatch = Stopwatch.StartNew();
             string path = args[0];
+            _logFilePath = args[1];
+
+            Write($"Starting {nameof(GenerateTestPackages)} \"{path}\"");
+
             var extension = Path.GetExtension(path);
 
             if (extension.Equals(".nuspec", StringComparison.OrdinalIgnoreCase))
@@ -28,14 +37,28 @@ namespace GenerateTestPackages
             {
                 BuildDependency(path);
             }
+
+            Write($"Finished {nameof(GenerateTestPackages)} \"{path}\"");
+        }
+
+        private static void Write(string message)
+        {
+            using (var stream = File.OpenWrite(_logFilePath))
+            using (var writer = new StreamWriter(stream))
+            {
+                writer.AutoFlush = true;
+
+                writer.WriteLine($"{DateTime.UtcNow.ToString("O")} {_stopwatch.Elapsed}:  {message}");
+            }
         }
 
         private static void BuildPackage(string nuspecPath)
         {
+            Write($"Starting {nameof(BuildPackage)}(\"{nuspecPath}\")");
             var repositoryPath = Path.GetDirectoryName(nuspecPath);
             var basePath = Path.Combine(repositoryPath, "files", Path.GetFileNameWithoutExtension(nuspecPath));
             Directory.CreateDirectory(basePath);
-            
+
             var createdFiles = new List<string>();
             bool deleteDir = true;
             using (var fileStream = File.OpenRead(nuspecPath))
@@ -54,7 +77,7 @@ namespace GenerateTestPackages
                             // A user created file exists. Continue to next file.
                             continue;
                         }
-                        
+
                         createdFiles.Add(outputPath);
                         string outputDir = Path.GetDirectoryName(outputPath);
                         if (!Directory.Exists(outputDir))
@@ -77,7 +100,7 @@ namespace GenerateTestPackages
 
                     packageBuilder.PopulateFiles(basePath, manifest.Files);
                 }
-                
+
                 string nupkgDirectory = Path.GetFullPath("packages");
                 Directory.CreateDirectory(nupkgDirectory);
                 string nupkgPath = Path.Combine(nupkgDirectory, Path.GetFileNameWithoutExtension(nuspecPath)) + ".nupkg";
@@ -92,17 +115,21 @@ namespace GenerateTestPackages
                 {
                     Directory.Delete(basePath, recursive: true);
                 }
-                else 
+                else
                 {
                     // Delete files that we created.
                     createdFiles.ForEach(File.Delete);
                 }
             }
             catch { }
+
+            Write($"Finished {nameof(BuildPackage)}(\"{nuspecPath}\")");
         }
 
         private static void BuildDependency(string path)
         {
+            Write($"Starting {nameof(BuildDependency)}(\"{path}\")");
+
             var document = XDocument.Load(path);
 
             XNamespace ns = "http://schemas.microsoft.com/vs/2009/dgml";
@@ -141,6 +168,8 @@ namespace GenerateTestPackages
                     EnsurePackageProcessed(package);
                 }
             }
+
+            Write($"Finished {nameof(BuildDependency)}(\"{path}\")");
         }
 
         static DependencyInfo GetDependencyInfoFromLinkTag(XElement linkTag)
@@ -181,7 +210,7 @@ namespace GenerateTestPackages
 
         static void CreateAssembly(PackageInfo package, string outputPath = null)
         {
-
+            Write($"Starting {nameof(CreateAssembly)}(...)");
             // Save the snk file from the embedded resource to the disk so we can use it when we compile
             using (var resStream = typeof(Program).Assembly.GetManifestResourceStream("GenerateTestPackages." + keyFileName))
             {
@@ -205,9 +234,13 @@ namespace GenerateTestPackages
                 compilerParams.ReferencedAssemblies.Add(GetAssemblyFullPath(dependency.FullName));
             }
 
+            Write($"Compiling in {nameof(CreateAssembly)}(...)");
+
             // Create the source code and compile it using CodeDom
             var generator = new AssemblySourceFileGenerator() { Package = package };
             CompilerResults results = codeProvider.CompileAssemblyFromSource(compilerParams, generator.TransformText());
+
+            Write($"Compiled in {nameof(CreateAssembly)}(...)");
 
             if (results.Errors.HasErrors)
             {
@@ -215,10 +248,13 @@ namespace GenerateTestPackages
             }
 
             File.Delete(keyFileName);
+
+            Write($"Finished {nameof(CreateAssembly)}(...)");
         }
 
         static void CreatePackage(PackageInfo package)
         {
+            Write($"Starting {nameof(CreatePackage)}(...)");
             var packageBuilder = new PackageBuilder()
             {
                 Id = package.Id,
@@ -235,7 +271,7 @@ namespace GenerateTestPackages
                 TargetPath = @"lib\" + Path.GetFileName(assemblySourcePath)
             });
 
-            var set = new PackageDependencySet(VersionUtility.DefaultTargetFramework, 
+            var set = new PackageDependencySet(VersionUtility.DefaultTargetFramework,
                 package.Dependencies.Select(dependency => new PackageDependency(dependency.Id, dependency.VersionSpec)));
             packageBuilder.DependencySets.Add(set);
 
@@ -243,6 +279,8 @@ namespace GenerateTestPackages
             {
                 packageBuilder.Save(stream);
             }
+
+            Write($"Finished {nameof(CreatePackage)}(...)");
         }
 
         static string GetAssemblyFullPath(FullPackageName fullName)
